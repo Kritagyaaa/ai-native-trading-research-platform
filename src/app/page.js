@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import niftyDataset from "@/data/nifty_daily.json";
+import { runBacktest } from "@/lib/backtest";
 
 const SUGGESTIONS = [
   "Does buying NIFTY after a sharp fall work?",
@@ -18,7 +20,7 @@ const DEFAULTS = {
 
 export default function Home() {
   const [question, setQuestion] = useState("");
-  const [step, setStep] = useState("ask"); // "ask" | "clarify" | "define"
+  const [step, setStep] = useState("ask"); // "ask" | "clarify" | "define" | "test"
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -32,6 +34,9 @@ export default function Home() {
     exit_condition: DEFAULTS.exit_condition,
     filters: DEFAULTS.filters,
   });
+
+  // Test backtest results
+  const [testResults, setTestResults] = useState(null);
 
   const handleAskSubmit = async (e) => {
     if (e) e.preventDefault();
@@ -54,7 +59,6 @@ export default function Home() {
 
       setRawExperiment(data);
 
-      // Initialize clarified values from extraction or defaults
       setClarifiedParams({
         entry_condition: data.entry_condition || DEFAULTS.entry_condition,
         holding_period_days: data.holding_period_days || DEFAULTS.holding_period_days,
@@ -62,7 +66,6 @@ export default function Home() {
         filters: data.filters || DEFAULTS.filters,
       });
 
-      // If there are missing fields that need clarification, go to clarify; else go directly to define
       if (data.missing_fields && data.missing_fields.length > 0) {
         setStep("clarify");
       } else {
@@ -80,11 +83,24 @@ export default function Home() {
     setStep("define");
   };
 
+  const handleRunTest = () => {
+    const results = runBacktest(niftyDataset, clarifiedParams);
+    setTestResults(results);
+    setStep("test");
+  };
+
   const handleReset = () => {
     setQuestion("");
     setStep("ask");
     setRawExperiment(null);
+    setTestResults(null);
     setError(null);
+  };
+
+  const formatPct = (val) => {
+    if (typeof val !== "number" || isNaN(val)) return "0.00%";
+    const sign = val > 0 ? "+" : "";
+    return `${sign}${(val * 100).toFixed(2)}%`;
   };
 
   return (
@@ -116,7 +132,9 @@ export default function Home() {
               3. DEFINE
             </span>
             <span className="text-slate-600">→</span>
-            <span className="text-slate-600">4. TEST</span>
+            <span className={step === "test" ? "text-emerald-400 font-medium" : "text-slate-400"}>
+              4. TEST
+            </span>
             <span className="text-slate-600">→</span>
             <span className="text-slate-600">5. LEARN</span>
           </div>
@@ -238,7 +256,6 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Note banner explaining the detected gaps */}
             <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-200 text-xs leading-relaxed space-y-1">
               <p className="font-semibold flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
@@ -255,7 +272,6 @@ export default function Home() {
             </div>
 
             <form onSubmit={handleClarifySubmit} className="space-y-4">
-              {/* Entry Condition Field */}
               <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/60 space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-mono uppercase text-slate-300 font-medium">
@@ -297,7 +313,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Holding Period Field */}
               <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/60 space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-mono uppercase text-slate-300 font-medium">
@@ -340,7 +355,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Exit Condition Field */}
               <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/60 space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-mono uppercase text-slate-300 font-medium">
@@ -384,7 +398,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Regime Filter Field */}
               <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/60 space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-mono uppercase text-slate-300 font-medium">
@@ -465,7 +478,6 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Experiment Card mirroring assignment structure */}
             <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl space-y-6">
               <div className="border-b border-slate-800/80 pb-4">
                 <p className="text-[11px] font-mono text-slate-400 uppercase tracking-wider mb-1">
@@ -531,11 +543,10 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Ready for TEST notice */}
               <div className="p-4 rounded-xl border border-slate-800 bg-slate-950/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div className="text-xs text-slate-400">
                   <span className="text-emerald-400 font-medium">Specification Complete.</span>{" "}
-                  Ready to test condition against sample NIFTY daily dataset.
+                  Click below to execute forward return test against the sample dataset.
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -547,13 +558,164 @@ export default function Home() {
                   </button>
                   <button
                     type="button"
-                    disabled
-                    className="px-4 py-2 rounded-lg bg-slate-800 text-slate-500 text-xs font-medium cursor-not-allowed"
-                    title="Phase 4 will activate the backtest"
+                    onClick={handleRunTest}
+                    className="px-5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-semibold shadow-md cursor-pointer flex items-center gap-1.5"
                   >
-                    Run Test (Phase 4) →
+                    Run Test (Phase 4)
+                    <span aria-hidden="true">→</span>
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* STAGE 4: TEST */}
+        {step === "test" && testResults && (
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-mono uppercase tracking-widest text-emerald-400 font-semibold">
+                  Stage 4 • TEST
+                </span>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setStep("define")}
+                    className="text-xs text-slate-400 hover:text-slate-200 underline cursor-pointer"
+                  >
+                    View Definition
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleReset}
+                    className="text-xs text-slate-400 hover:text-slate-200 underline cursor-pointer"
+                  >
+                    New Hypothesis
+                  </button>
+                </div>
+              </div>
+              <h2 className="text-2xl font-semibold text-slate-50">
+                Sample Returns Against Defined Condition
+              </h2>
+              <p className="text-slate-400 text-sm">
+                Evaluating empirical forward returns after condition triggers vs. unconditional baseline.
+              </p>
+            </div>
+
+            {/* Synthetic data disclosure banner */}
+            <div className="p-3.5 rounded-xl border border-sky-500/30 bg-sky-500/10 text-sky-200 text-xs flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-sky-400" />
+                <span>
+                  <strong>Dataset:</strong> Synthetic NIFTY 50 Daily Closes (750 trading sessions, 2022–2024 calibrated to historical volatility).
+                </span>
+              </div>
+              <span className="font-mono text-[11px] text-sky-300">
+                N = {testResults.sampleSize} events
+              </span>
+            </div>
+
+            {/* Raw output card */}
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl space-y-6">
+              {/* Stat grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="p-4 rounded-xl border border-slate-800 bg-slate-950/60">
+                  <p className="text-[10px] font-mono uppercase tracking-wider text-slate-500">
+                    Sample Size (Events)
+                  </p>
+                  <p className="text-2xl font-bold text-slate-100 mt-1 font-mono">
+                    {testResults.sampleSize}
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Triggered occurrences
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl border border-slate-800 bg-slate-950/60">
+                  <p className="text-[10px] font-mono uppercase tracking-wider text-slate-500">
+                    Avg Return ({clarifiedParams.holding_period_days}d)
+                  </p>
+                  <p
+                    className={`text-2xl font-bold mt-1 font-mono ${
+                      testResults.avgReturn >= 0 ? "text-emerald-400" : "text-rose-400"
+                    }`}
+                  >
+                    {formatPct(testResults.avgReturn)}
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    After condition trigger
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl border border-slate-800 bg-slate-950/60">
+                  <p className="text-[10px] font-mono uppercase tracking-wider text-slate-500">
+                    Baseline Return ({clarifiedParams.holding_period_days}d)
+                  </p>
+                  <p className="text-2xl font-bold text-slate-200 mt-1 font-mono">
+                    {formatPct(testResults.baselineAvgReturn)}
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Unconditional index avg
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl border border-slate-800 bg-slate-950/60">
+                  <p className="text-[10px] font-mono uppercase tracking-wider text-slate-500">
+                    Excess vs Baseline
+                  </p>
+                  <p
+                    className={`text-2xl font-bold mt-1 font-mono ${
+                      testResults.excessReturn >= 0 ? "text-emerald-400" : "text-rose-400"
+                    }`}
+                  >
+                    {formatPct(testResults.excessReturn)}
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Strategy alpha vs market
+                  </p>
+                </div>
+              </div>
+
+              {/* Secondary details */}
+              <div className="p-4 rounded-xl border border-slate-800/80 bg-slate-950/40 grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-mono">
+                <div>
+                  <span className="text-slate-500">Condition Win Rate:</span>{" "}
+                  <span className="text-slate-200 font-medium">
+                    {(testResults.winRate * 100).toFixed(1)}%
+                  </span>{" "}
+                  <span className="text-slate-500">
+                    (vs {(testResults.baselineWinRate * 100).toFixed(1)}% baseline)
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500">Best Trade:</span>{" "}
+                  <span className="text-emerald-400 font-medium">
+                    {formatPct(testResults.bestTrade)}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500">Worst Trade:</span>{" "}
+                  <span className="text-rose-400 font-medium">
+                    {formatPct(testResults.worstTrade)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Callout ready for LEARN phase */}
+              <div className="p-4 rounded-xl border border-slate-800 bg-slate-950/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="text-xs text-slate-400">
+                  <span className="text-emerald-400 font-medium">Test Complete.</span>{" "}
+                  Forward returns computed against baseline.
+                </div>
+                <button
+                  type="button"
+                  disabled
+                  className="px-4 py-2 rounded-lg bg-slate-800 text-slate-500 text-xs font-medium cursor-not-allowed"
+                  title="Phase 5 will render the LEARN stage"
+                >
+                  Interpret Results (Phase 5) →
+                </button>
               </div>
             </div>
           </div>
