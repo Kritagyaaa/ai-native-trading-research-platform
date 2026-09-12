@@ -2,6 +2,8 @@
 
 An AI-native quantitative research prototype that transforms natural-language trading hypotheses into structured, testable empirical experiments following the **ASK → CLARIFY → DEFINE → TEST → LEARN** research methodology.
 
+**Live Deployment:** [https://ai-native-trading-research-platform.vercel.app](https://ai-native-trading-research-platform.vercel.app)
+
 Built for the **AI Full-Stack Developer Intern Challenge (Option 2)**.
 
 ---
