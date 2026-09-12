@@ -73,10 +73,27 @@ export default function Home() {
         setStep("define");
       }
     } catch (err) {
-      setError(err.message || "An unexpected error occurred.");
+      setError(err.message || "An unexpected error occurred connecting to Gemini API.");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleUseFallbackDefaults = () => {
+    // Graceful offline fallback in case of external API issues
+    setError(null);
+    setRawExperiment({
+      instrument: "NIFTY",
+      timeframe: "daily",
+      entry_condition: null,
+      exit_condition: null,
+      holding_period_days: null,
+      filters: null,
+      underlying_question: question || "Does buying NIFTY after a sharp fall work?",
+      missing_fields: ["entry_condition", "holding_period_days", "exit_condition"],
+    });
+    setClarifiedParams(DEFAULTS);
+    setStep("clarify");
   };
 
   const handleClarifySubmit = (e) => {
@@ -117,71 +134,96 @@ export default function Home() {
     return `${sign}${(val * 100).toFixed(2)}%`;
   };
 
+  const stepOrder = ["ask", "clarify", "define", "test", "learn"];
+  const currentStepIndex = stepOrder.indexOf(step) + 1;
+
   return (
-    <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col">
+    <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col antialiased">
       {/* Header */}
-      <header className="border-b border-slate-800/80 bg-slate-950/60 backdrop-blur px-6 py-4 sticky top-0 z-20">
+      <header className="border-b border-slate-800/80 bg-slate-950/70 backdrop-blur px-4 sm:px-6 py-3.5 sticky top-0 z-20">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
-            <span className="font-semibold tracking-tight text-slate-100">
+            <span className="font-semibold tracking-tight text-slate-100 text-sm sm:text-base">
               AI-Native Trading Research
             </span>
-            <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">
-              v0.1 Prototype
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">
+              Option 2
             </span>
           </div>
 
-          {/* Stepper indicator */}
-          <div className="flex items-center gap-2 text-xs font-mono">
-            <span className={step === "ask" ? "text-emerald-400 font-medium" : "text-slate-400"}>
-              1. ASK
-            </span>
-            <span className="text-slate-600">→</span>
-            <span className={step === "clarify" ? "text-emerald-400 font-medium" : "text-slate-400"}>
-              2. CLARIFY
-            </span>
-            <span className="text-slate-600">→</span>
-            <span className={step === "define" ? "text-emerald-400 font-medium" : "text-slate-400"}>
-              3. DEFINE
-            </span>
-            <span className="text-slate-600">→</span>
-            <span className={step === "test" ? "text-emerald-400 font-medium" : "text-slate-400"}>
-              4. TEST
-            </span>
-            <span className="text-slate-600">→</span>
-            <span className={step === "learn" ? "text-emerald-400 font-medium" : "text-slate-400"}>
-              5. LEARN
-            </span>
+          {/* Desktop Stepper indicator */}
+          <div className="hidden sm:flex items-center gap-2 text-xs font-mono">
+            {stepOrder.map((s, i) => (
+              <span key={s} className="flex items-center gap-2">
+                <span
+                  className={
+                    step === s
+                      ? "text-emerald-400 font-medium"
+                      : currentStepIndex > i + 1
+                      ? "text-slate-300"
+                      : "text-slate-600"
+                  }
+                >
+                  {i + 1}. {s.toUpperCase()}
+                </span>
+                {i < stepOrder.length - 1 && <span className="text-slate-700">→</span>}
+              </span>
+            ))}
+          </div>
+
+          {/* Mobile Step Badge */}
+          <div className="sm:hidden text-xs font-mono px-2 py-1 rounded bg-slate-900 border border-slate-800 text-emerald-400">
+            Stage {currentStepIndex}/5 • {step.toUpperCase()}
           </div>
         </div>
       </header>
 
       {/* Main container */}
-      <main className="flex-1 max-w-3xl w-full mx-auto px-6 py-10 flex flex-col justify-center">
+      <main className="flex-1 max-w-3xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-12 flex flex-col justify-center">
+        {/* Error banner with retry options */}
         {error && (
-          <div className="mb-6 p-4 rounded-xl border border-rose-500/40 bg-rose-500/10 text-rose-300 text-sm flex items-start justify-between">
-            <div>
-              <p className="font-medium">Error running analysis</p>
-              <p className="text-xs text-rose-400/90 mt-1">{error}</p>
+          <div className="mb-6 p-4 rounded-xl border border-rose-500/40 bg-rose-500/10 text-rose-300 text-sm space-y-3">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="font-semibold flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-rose-400" />
+                  API Communication Notice
+                </p>
+                <p className="text-xs text-rose-300/90 mt-1 font-mono break-all">{error}</p>
+              </div>
+              <button
+                onClick={() => setError(null)}
+                className="text-xs text-rose-400 hover:text-rose-200 cursor-pointer"
+              >
+                Dismiss
+              </button>
             </div>
-            <button
-              onClick={() => setError(null)}
-              className="text-xs text-rose-400 hover:text-rose-200 cursor-pointer"
-            >
-              Dismiss
-            </button>
+            <div className="flex items-center gap-3 pt-1 border-t border-rose-500/20 text-xs">
+              <button
+                onClick={(e) => handleAskSubmit(e)}
+                className="px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 font-medium cursor-pointer transition-colors"
+              >
+                Retry API Call
+              </button>
+              <button
+                onClick={handleUseFallbackDefaults}
+                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 cursor-pointer transition-colors"
+              >
+                Continue with Methodology Defaults
+              </button>
+            </div>
           </div>
         )}
 
         {/* STAGE 1: ASK */}
         {step === "ask" && (
-          <div className="space-y-8">
-            <div className="space-y-3">
+          <div className="space-y-6 sm:space-y-8">
+            <div className="space-y-2 sm:space-y-3">
               <span className="text-xs font-mono uppercase tracking-widest text-emerald-400 font-semibold">
                 Stage 1 • ASK
               </span>
-              <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-slate-50">
+              <h1 className="text-2xl sm:text-4xl font-semibold tracking-tight text-slate-50">
                 Ask a trading research question
               </h1>
               <p className="text-slate-400 text-sm sm:text-base leading-relaxed">
@@ -198,23 +240,23 @@ export default function Home() {
                   value={question}
                   onChange={(e) => setQuestion(e.target.value)}
                   placeholder="e.g. Does buying NIFTY after a sharp fall work?"
-                  className="w-full bg-transparent px-3 py-2 text-slate-100 placeholder-slate-500 text-base focus:outline-none resize-none font-sans"
+                  className="w-full bg-transparent px-3 py-2 text-slate-100 placeholder-slate-500 text-sm sm:text-base focus:outline-none resize-none font-sans"
                   disabled={loading}
                 />
 
-                <div className="flex items-center justify-between pt-2 border-t border-slate-800/60 px-2">
-                  <span className="text-xs text-slate-500 font-mono">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-2 border-t border-slate-800/60 px-2 gap-2 sm:gap-0">
+                  <span className="text-[11px] text-slate-500 font-mono">
                     Scoping: NIFTY 50 daily closes
                   </span>
                   <button
                     type="submit"
                     disabled={!question.trim() || loading}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-medium text-sm transition-all shadow-sm cursor-pointer disabled:cursor-not-allowed"
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-medium text-xs sm:text-sm transition-all shadow-sm cursor-pointer disabled:cursor-not-allowed"
                   >
                     {loading ? (
                       <>
                         <span className="w-3.5 h-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
-                        Extracting Logic...
+                        Extracting Logic with Gemini...
                       </>
                     ) : (
                       <>
@@ -226,6 +268,14 @@ export default function Home() {
                 </div>
               </div>
             </form>
+
+            {/* Loading state indicator card */}
+            {loading && (
+              <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-950/20 text-xs text-emerald-300 font-mono flex items-center gap-3 animate-pulse">
+                <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                <span>Extracting quantitative parameters and identifying ambiguities...</span>
+              </div>
+            )}
 
             <div className="space-y-2 pt-2">
               <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
@@ -267,10 +317,10 @@ export default function Home() {
                   Start Over
                 </button>
               </div>
-              <h2 className="text-2xl font-semibold text-slate-50">
+              <h2 className="text-xl sm:text-2xl font-semibold text-slate-50">
                 Clarify Missing & Ambiguous Parameters
               </h2>
-              <p className="text-slate-400 text-sm">
+              <p className="text-slate-400 text-xs sm:text-sm">
                 Your question: &ldquo;<span className="text-slate-200">{question}</span>&rdquo;
               </p>
             </div>
@@ -291,13 +341,14 @@ export default function Home() {
             </div>
 
             <form onSubmit={handleClarifySubmit} className="space-y-4">
+              {/* Entry Condition Field */}
               <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/60 space-y-2">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-0">
                   <label className="text-xs font-mono uppercase text-slate-300 font-medium">
                     1. Entry Trigger Condition (Drop Magnitude)
                   </label>
                   {rawExperiment.missing_fields?.includes("entry_condition") && (
-                    <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">
+                    <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 w-fit">
                       Ambiguous in query
                     </span>
                   )}
@@ -332,13 +383,14 @@ export default function Home() {
                 </div>
               </div>
 
+              {/* Holding Period Field */}
               <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/60 space-y-2">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-0">
                   <label className="text-xs font-mono uppercase text-slate-300 font-medium">
                     2. Holding Period Horizon
                   </label>
                   {rawExperiment.missing_fields?.includes("holding_period_days") && (
-                    <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">
+                    <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 w-fit">
                       Unspecified in query
                     </span>
                   )}
@@ -374,13 +426,14 @@ export default function Home() {
                 </div>
               </div>
 
+              {/* Exit Condition Field */}
               <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/60 space-y-2">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-0">
                   <label className="text-xs font-mono uppercase text-slate-300 font-medium">
                     3. Exit Condition Strategy
                   </label>
                   {rawExperiment.missing_fields?.includes("exit_condition") && (
-                    <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">
+                    <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 w-fit">
                       Unspecified in query
                     </span>
                   )}
@@ -417,13 +470,14 @@ export default function Home() {
                 </div>
               </div>
 
+              {/* Regime Filter Field */}
               <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/60 space-y-2">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-0">
                   <label className="text-xs font-mono uppercase text-slate-300 font-medium">
                     4. Market Regime / Volatility Filter
                   </label>
                   {rawExperiment.missing_fields?.includes("filters") && (
-                    <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">
+                    <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 w-fit">
                       Unfiltered in query
                     </span>
                   )}
@@ -463,7 +517,7 @@ export default function Home() {
               <div className="flex items-center justify-end pt-2">
                 <button
                   type="submit"
-                  className="px-6 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-medium text-sm transition-all shadow-md cursor-pointer flex items-center gap-2"
+                  className="w-full sm:w-auto px-6 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-medium text-sm transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
                 >
                   Confirm & Define Experiment
                   <span aria-hidden="true">→</span>
@@ -489,28 +543,28 @@ export default function Home() {
                   Adjust Parameters
                 </button>
               </div>
-              <h2 className="text-2xl font-semibold text-slate-50">
+              <h2 className="text-xl sm:text-2xl font-semibold text-slate-50">
                 Structured Experiment Card
               </h2>
-              <p className="text-slate-400 text-sm">
+              <p className="text-slate-400 text-xs sm:text-sm">
                 Formalized quantitative specification ready for empirical backtesting.
               </p>
             </div>
 
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl space-y-6">
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 sm:p-6 shadow-2xl space-y-6">
               <div className="border-b border-slate-800/80 pb-4">
                 <p className="text-[11px] font-mono text-slate-400 uppercase tracking-wider mb-1">
                   Underlying Research Question
                 </p>
-                <p className="text-lg font-medium text-slate-100 leading-snug">
+                <p className="text-base sm:text-lg font-medium text-slate-100 leading-snug">
                   {rawExperiment?.underlying_question || question}
                 </p>
-                <p className="text-xs text-slate-500 mt-1.5 font-mono">
+                <p className="text-xs text-slate-500 mt-1.5 font-mono break-words">
                   Original Query: &ldquo;{question}&rdquo;
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs font-mono">
                 <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/50 space-y-1">
                   <span className="text-slate-500 uppercase tracking-wider text-[10px]">
                     Instrument / Asset
@@ -567,7 +621,7 @@ export default function Home() {
                   <span className="text-emerald-400 font-medium">Specification Complete.</span>{" "}
                   Click below to execute forward return test against the sample dataset.
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                   <button
                     type="button"
                     onClick={handleReset}
@@ -614,17 +668,17 @@ export default function Home() {
                   </button>
                 </div>
               </div>
-              <h2 className="text-2xl font-semibold text-slate-50">
+              <h2 className="text-xl sm:text-2xl font-semibold text-slate-50">
                 Sample Returns Against Defined Condition
               </h2>
-              <p className="text-slate-400 text-sm">
+              <p className="text-slate-400 text-xs sm:text-sm">
                 Evaluating empirical forward returns after condition triggers vs. unconditional baseline.
               </p>
             </div>
 
-            <div className="p-3.5 rounded-xl border border-sky-500/30 bg-sky-500/10 text-sky-200 text-xs flex items-center justify-between">
+            <div className="p-3.5 rounded-xl border border-sky-500/30 bg-sky-500/10 text-sky-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-0">
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-sky-400" />
+                <span className="w-2 h-2 rounded-full bg-sky-400 shrink-0" />
                 <span>
                   <strong>Dataset:</strong> Synthetic NIFTY 50 Daily Closes (750 trading sessions, 2022–2024 calibrated to historical volatility).
                 </span>
@@ -634,66 +688,66 @@ export default function Home() {
               </span>
             </div>
 
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl space-y-6">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div className="p-4 rounded-xl border border-slate-800 bg-slate-950/60">
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 sm:p-6 shadow-2xl space-y-6">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                <div className="p-3.5 sm:p-4 rounded-xl border border-slate-800 bg-slate-950/60">
                   <p className="text-[10px] font-mono uppercase tracking-wider text-slate-500">
                     Sample Size (Events)
                   </p>
-                  <p className="text-2xl font-bold text-slate-100 mt-1 font-mono">
+                  <p className="text-xl sm:text-2xl font-bold text-slate-100 mt-1 font-mono">
                     {testResults.sampleSize}
                   </p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
+                  <p className="text-[10px] text-slate-500 mt-0.5">
                     Triggered occurrences
                   </p>
                 </div>
 
-                <div className="p-4 rounded-xl border border-slate-800 bg-slate-950/60">
+                <div className="p-3.5 sm:p-4 rounded-xl border border-slate-800 bg-slate-950/60">
                   <p className="text-[10px] font-mono uppercase tracking-wider text-slate-500">
                     Avg Return ({clarifiedParams.holding_period_days}d)
                   </p>
                   <p
-                    className={`text-2xl font-bold mt-1 font-mono ${
+                    className={`text-xl sm:text-2xl font-bold mt-1 font-mono ${
                       testResults.avgReturn >= 0 ? "text-emerald-400" : "text-rose-400"
                     }`}
                   >
                     {formatPct(testResults.avgReturn)}
                   </p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
+                  <p className="text-[10px] text-slate-500 mt-0.5">
                     After condition trigger
                   </p>
                 </div>
 
-                <div className="p-4 rounded-xl border border-slate-800 bg-slate-950/60">
+                <div className="p-3.5 sm:p-4 rounded-xl border border-slate-800 bg-slate-950/60">
                   <p className="text-[10px] font-mono uppercase tracking-wider text-slate-500">
                     Baseline Return ({clarifiedParams.holding_period_days}d)
                   </p>
-                  <p className="text-2xl font-bold text-slate-200 mt-1 font-mono">
+                  <p className="text-xl sm:text-2xl font-bold text-slate-200 mt-1 font-mono">
                     {formatPct(testResults.baselineAvgReturn)}
                   </p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
+                  <p className="text-[10px] text-slate-500 mt-0.5">
                     Unconditional index avg
                   </p>
                 </div>
 
-                <div className="p-4 rounded-xl border border-slate-800 bg-slate-950/60">
+                <div className="p-3.5 sm:p-4 rounded-xl border border-slate-800 bg-slate-950/60">
                   <p className="text-[10px] font-mono uppercase tracking-wider text-slate-500">
                     Excess vs Baseline
                   </p>
                   <p
-                    className={`text-2xl font-bold mt-1 font-mono ${
+                    className={`text-xl sm:text-2xl font-bold mt-1 font-mono ${
                       testResults.excessReturn >= 0 ? "text-emerald-400" : "text-rose-400"
                     }`}
                   >
                     {formatPct(testResults.excessReturn)}
                   </p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
+                  <p className="text-[10px] text-slate-500 mt-0.5">
                     Strategy alpha vs market
                   </p>
                 </div>
               </div>
 
-              <div className="p-4 rounded-xl border border-slate-800/80 bg-slate-950/40 grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-mono">
+              <div className="p-4 rounded-xl border border-slate-800/80 bg-slate-950/40 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 text-xs font-mono">
                 <div>
                   <span className="text-slate-500">Condition Win Rate:</span>{" "}
                   <span className="text-slate-200 font-medium">
@@ -725,7 +779,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={handleGoToLearn}
-                  className="px-5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-semibold shadow-md cursor-pointer flex items-center gap-1.5"
+                  className="w-full sm:w-auto px-5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-semibold shadow-md cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   Interpret Results (LEARN)
                   <span aria-hidden="true">→</span>
@@ -737,7 +791,7 @@ export default function Home() {
 
         {/* STAGE 5: LEARN (Explicit separation requested by brief) */}
         {step === "learn" && testResults && (
-          <div className="space-y-8">
+          <div className="space-y-6 sm:space-y-8">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-mono uppercase tracking-widest text-emerald-400 font-semibold">
@@ -760,38 +814,38 @@ export default function Home() {
                   </button>
                 </div>
               </div>
-              <h2 className="text-2xl font-semibold text-slate-50">
+              <h2 className="text-xl sm:text-2xl font-semibold text-slate-50">
                 Research Findings & Inference
               </h2>
-              <p className="text-slate-400 text-sm">
+              <p className="text-slate-400 text-xs sm:text-sm">
                 Strict separation between empirical observation and inductive system conclusions.
               </p>
             </div>
 
             {/* BLOCK 1: What the data shows (Raw numbers only, no interpretation) */}
-            <div className="rounded-2xl border border-cyan-800/60 bg-cyan-950/20 p-6 shadow-xl space-y-4">
+            <div className="rounded-2xl border border-cyan-800/60 bg-cyan-950/20 p-5 sm:p-6 shadow-xl space-y-4">
               <div className="flex items-center justify-between border-b border-cyan-800/40 pb-3">
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-cyan-400" />
-                  <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-cyan-300">
+                  <h3 className="text-xs sm:text-sm font-mono font-bold uppercase tracking-wider text-cyan-300">
                     What the data shows (Raw Numbers Only)
                   </h3>
                 </div>
-                <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-cyan-900/60 text-cyan-300 border border-cyan-700/50">
+                <span className="text-[10px] sm:text-[11px] font-mono px-2 py-0.5 rounded bg-cyan-900/60 text-cyan-300 border border-cyan-700/50">
                   Empirical Fact
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs font-mono pt-1">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3 text-xs font-mono pt-1">
                 <div className="p-3 rounded-lg bg-slate-950/70 border border-cyan-900/40">
                   <span className="text-slate-400 text-[11px] block">Triggered Events (N)</span>
-                  <span className="text-lg font-bold text-cyan-200">{testResults.sampleSize}</span>
+                  <span className="text-base sm:text-lg font-bold text-cyan-200">{testResults.sampleSize}</span>
                   <span className="text-[10px] text-slate-500 block">out of 750 trading sessions</span>
                 </div>
 
                 <div className="p-3 rounded-lg bg-slate-950/70 border border-cyan-900/40">
                   <span className="text-slate-400 text-[11px] block">Mean Forward Return</span>
-                  <span className={`text-lg font-bold ${testResults.avgReturn >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                  <span className={`text-base sm:text-lg font-bold ${testResults.avgReturn >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
                     {formatPct(testResults.avgReturn)}
                   </span>
                   <span className="text-[10px] text-slate-500 block">over {clarifiedParams.holding_period_days} trading days</span>
@@ -799,7 +853,7 @@ export default function Home() {
 
                 <div className="p-3 rounded-lg bg-slate-950/70 border border-cyan-900/40">
                   <span className="text-slate-400 text-[11px] block">Unconditional Baseline</span>
-                  <span className="text-lg font-bold text-slate-200">
+                  <span className="text-base sm:text-lg font-bold text-slate-200">
                     {formatPct(testResults.baselineAvgReturn)}
                   </span>
                   <span className="text-[10px] text-slate-500 block">all {testResults.totalWindows} rolling windows</span>
@@ -807,7 +861,7 @@ export default function Home() {
 
                 <div className="p-3 rounded-lg bg-slate-950/70 border border-cyan-900/40">
                   <span className="text-slate-400 text-[11px] block">Excess Return vs Baseline</span>
-                  <span className={`text-lg font-bold ${testResults.excessReturn >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                  <span className={`text-base sm:text-lg font-bold ${testResults.excessReturn >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
                     {formatPct(testResults.excessReturn)}
                   </span>
                   <span className="text-[10px] text-slate-500 block">strategy alpha</span>
@@ -815,7 +869,7 @@ export default function Home() {
 
                 <div className="p-3 rounded-lg bg-slate-950/70 border border-cyan-900/40">
                   <span className="text-slate-400 text-[11px] block">Win Rate (Positive Returns)</span>
-                  <span className="text-lg font-bold text-slate-200">
+                  <span className="text-base sm:text-lg font-bold text-slate-200">
                     {(testResults.winRate * 100).toFixed(1)}%
                   </span>
                   <span className="text-[10px] text-slate-500 block">vs {(testResults.baselineWinRate * 100).toFixed(1)}% baseline</span>
@@ -836,20 +890,20 @@ export default function Home() {
             </div>
 
             {/* BLOCK 2: What the system concludes (Plain-language takeaway + labeled as inference) */}
-            <div className="rounded-2xl border-l-4 border-l-emerald-400 border-r border-t border-b border-slate-800 bg-slate-900/90 p-6 shadow-2xl space-y-5">
+            <div className="rounded-2xl border-l-4 border-l-emerald-400 border-r border-t border-b border-slate-800 bg-slate-900/90 p-5 sm:p-6 shadow-2xl space-y-5">
               <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                  <h3 className="text-sm font-semibold uppercase tracking-wider text-emerald-400 font-mono">
+                  <h3 className="text-xs sm:text-sm font-semibold uppercase tracking-wider text-emerald-400 font-mono">
                     What the system concludes (Inductive Inference)
                   </h3>
                 </div>
-                <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800/60">
+                <span className="text-[10px] sm:text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800/60">
                   Qualitative Takeaway
                 </span>
               </div>
 
-              <div className="space-y-3 text-sm text-slate-300 leading-relaxed font-sans">
+              <div className="space-y-3 text-xs sm:text-sm text-slate-300 leading-relaxed font-sans">
                 <p>
                   <strong>Core Takeaway:</strong> In this 3-year market window,{" "}
                   <span className="text-slate-100 font-medium">
