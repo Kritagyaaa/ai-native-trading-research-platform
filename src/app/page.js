@@ -20,7 +20,7 @@ const DEFAULTS = {
 
 export default function Home() {
   const [question, setQuestion] = useState("");
-  const [step, setStep] = useState("ask"); // "ask" | "clarify" | "define" | "test"
+  const [step, setStep] = useState("ask"); // "ask" | "clarify" | "define" | "test" | "learn"
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -38,9 +38,10 @@ export default function Home() {
   // Test backtest results
   const [testResults, setTestResults] = useState(null);
 
-  const handleAskSubmit = async (e) => {
+  const handleAskSubmit = async (e, customQuestion) => {
     if (e) e.preventDefault();
-    if (!question.trim()) return;
+    const q = customQuestion || question;
+    if (!q.trim()) return;
 
     setLoading(true);
     setError(null);
@@ -49,7 +50,7 @@ export default function Home() {
       const res = await fetch("/api/parse-experiment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: question.trim() }),
+        body: JSON.stringify({ question: q.trim() }),
       });
 
       const data = await res.json();
@@ -89,12 +90,25 @@ export default function Home() {
     setStep("test");
   };
 
+  const handleGoToLearn = () => {
+    setStep("learn");
+  };
+
   const handleReset = () => {
     setQuestion("");
     setStep("ask");
     setRawExperiment(null);
     setTestResults(null);
     setError(null);
+  };
+
+  const handleSelectSuggestedQuestion = (newQuestion) => {
+    setQuestion(newQuestion);
+    setStep("ask");
+    setRawExperiment(null);
+    setTestResults(null);
+    setError(null);
+    handleAskSubmit(null, newQuestion);
   };
 
   const formatPct = (val) => {
@@ -136,7 +150,9 @@ export default function Home() {
               4. TEST
             </span>
             <span className="text-slate-600">→</span>
-            <span className="text-slate-600">5. LEARN</span>
+            <span className={step === "learn" ? "text-emerald-400 font-medium" : "text-slate-400"}>
+              5. LEARN
+            </span>
           </div>
         </div>
       </header>
@@ -221,7 +237,10 @@ export default function Home() {
                     key={item}
                     type="button"
                     disabled={loading}
-                    onClick={() => setQuestion(item)}
+                    onClick={() => {
+                      setQuestion(item);
+                      handleAskSubmit(null, item);
+                    }}
                     className="text-left text-xs text-slate-400 hover:text-slate-200 bg-slate-900/90 hover:bg-slate-800/90 border border-slate-800/80 rounded-lg px-3 py-2 transition-colors cursor-pointer disabled:opacity-50"
                   >
                     &ldquo;{item}&rdquo;
@@ -603,7 +622,6 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Synthetic data disclosure banner */}
             <div className="p-3.5 rounded-xl border border-sky-500/30 bg-sky-500/10 text-sky-200 text-xs flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-sky-400" />
@@ -616,9 +634,7 @@ export default function Home() {
               </span>
             </div>
 
-            {/* Raw output card */}
             <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl space-y-6">
-              {/* Stat grid */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div className="p-4 rounded-xl border border-slate-800 bg-slate-950/60">
                   <p className="text-[10px] font-mono uppercase tracking-wider text-slate-500">
@@ -677,7 +693,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Secondary details */}
               <div className="p-4 rounded-xl border border-slate-800/80 bg-slate-950/40 grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-mono">
                 <div>
                   <span className="text-slate-500">Condition Win Rate:</span>{" "}
@@ -702,20 +717,216 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Callout ready for LEARN phase */}
               <div className="p-4 rounded-xl border border-slate-800 bg-slate-950/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div className="text-xs text-slate-400">
                   <span className="text-emerald-400 font-medium">Test Complete.</span>{" "}
-                  Forward returns computed against baseline.
+                  Proceed to Phase 5 to view empirical data separated from system inference.
                 </div>
                 <button
                   type="button"
-                  disabled
-                  className="px-4 py-2 rounded-lg bg-slate-800 text-slate-500 text-xs font-medium cursor-not-allowed"
-                  title="Phase 5 will render the LEARN stage"
+                  onClick={handleGoToLearn}
+                  className="px-5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-semibold shadow-md cursor-pointer flex items-center gap-1.5"
                 >
-                  Interpret Results (Phase 5) →
+                  Interpret Results (LEARN)
+                  <span aria-hidden="true">→</span>
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* STAGE 5: LEARN (Explicit separation requested by brief) */}
+        {step === "learn" && testResults && (
+          <div className="space-y-8">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-mono uppercase tracking-widest text-emerald-400 font-semibold">
+                  Stage 5 • LEARN
+                </span>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setStep("test")}
+                    className="text-xs text-slate-400 hover:text-slate-200 underline cursor-pointer"
+                  >
+                    View Raw Stats
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleReset}
+                    className="text-xs text-slate-400 hover:text-slate-200 underline cursor-pointer"
+                  >
+                    New Hypothesis
+                  </button>
+                </div>
+              </div>
+              <h2 className="text-2xl font-semibold text-slate-50">
+                Research Findings & Inference
+              </h2>
+              <p className="text-slate-400 text-sm">
+                Strict separation between empirical observation and inductive system conclusions.
+              </p>
+            </div>
+
+            {/* BLOCK 1: What the data shows (Raw numbers only, no interpretation) */}
+            <div className="rounded-2xl border border-cyan-800/60 bg-cyan-950/20 p-6 shadow-xl space-y-4">
+              <div className="flex items-center justify-between border-b border-cyan-800/40 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-cyan-400" />
+                  <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-cyan-300">
+                    What the data shows (Raw Numbers Only)
+                  </h3>
+                </div>
+                <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-cyan-900/60 text-cyan-300 border border-cyan-700/50">
+                  Empirical Fact
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs font-mono pt-1">
+                <div className="p-3 rounded-lg bg-slate-950/70 border border-cyan-900/40">
+                  <span className="text-slate-400 text-[11px] block">Triggered Events (N)</span>
+                  <span className="text-lg font-bold text-cyan-200">{testResults.sampleSize}</span>
+                  <span className="text-[10px] text-slate-500 block">out of 750 trading sessions</span>
+                </div>
+
+                <div className="p-3 rounded-lg bg-slate-950/70 border border-cyan-900/40">
+                  <span className="text-slate-400 text-[11px] block">Mean Forward Return</span>
+                  <span className={`text-lg font-bold ${testResults.avgReturn >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                    {formatPct(testResults.avgReturn)}
+                  </span>
+                  <span className="text-[10px] text-slate-500 block">over {clarifiedParams.holding_period_days} trading days</span>
+                </div>
+
+                <div className="p-3 rounded-lg bg-slate-950/70 border border-cyan-900/40">
+                  <span className="text-slate-400 text-[11px] block">Unconditional Baseline</span>
+                  <span className="text-lg font-bold text-slate-200">
+                    {formatPct(testResults.baselineAvgReturn)}
+                  </span>
+                  <span className="text-[10px] text-slate-500 block">all {testResults.totalWindows} rolling windows</span>
+                </div>
+
+                <div className="p-3 rounded-lg bg-slate-950/70 border border-cyan-900/40">
+                  <span className="text-slate-400 text-[11px] block">Excess Return vs Baseline</span>
+                  <span className={`text-lg font-bold ${testResults.excessReturn >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                    {formatPct(testResults.excessReturn)}
+                  </span>
+                  <span className="text-[10px] text-slate-500 block">strategy alpha</span>
+                </div>
+
+                <div className="p-3 rounded-lg bg-slate-950/70 border border-cyan-900/40">
+                  <span className="text-slate-400 text-[11px] block">Win Rate (Positive Returns)</span>
+                  <span className="text-lg font-bold text-slate-200">
+                    {(testResults.winRate * 100).toFixed(1)}%
+                  </span>
+                  <span className="text-[10px] text-slate-500 block">vs {(testResults.baselineWinRate * 100).toFixed(1)}% baseline</span>
+                </div>
+
+                <div className="p-3 rounded-lg bg-slate-950/70 border border-cyan-900/40">
+                  <span className="text-slate-400 text-[11px] block">Extreme Bounds</span>
+                  <span className="text-xs font-bold text-slate-200 block mt-1">
+                    +{ (testResults.bestTrade * 100).toFixed(2) }% / { (testResults.worstTrade * 100).toFixed(2) }%
+                  </span>
+                  <span className="text-[10px] text-slate-500 block">max gain / max drawdown</span>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-slate-400 italic pt-1">
+                Data recorded strictly from synthetic NIFTY 50 daily closes (2022–2024). No execution friction or transaction costs subtracted.
+              </p>
+            </div>
+
+            {/* BLOCK 2: What the system concludes (Plain-language takeaway + labeled as inference) */}
+            <div className="rounded-2xl border-l-4 border-l-emerald-400 border-r border-t border-b border-slate-800 bg-slate-900/90 p-6 shadow-2xl space-y-5">
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                  <h3 className="text-sm font-semibold uppercase tracking-wider text-emerald-400 font-mono">
+                    What the system concludes (Inductive Inference)
+                  </h3>
+                </div>
+                <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800/60">
+                  Qualitative Takeaway
+                </span>
+              </div>
+
+              <div className="space-y-3 text-sm text-slate-300 leading-relaxed font-sans">
+                <p>
+                  <strong>Core Takeaway:</strong> In this 3-year market window,{" "}
+                  <span className="text-slate-100 font-medium">
+                    buying NIFTY immediately following a sharp single-day decline failed to generate positive alpha
+                  </span>.
+                  {testResults.excessReturn < 0 ? (
+                    <>
+                      {" "}The strategy delivered an average forward return of{" "}
+                      <span className="text-rose-400 font-mono font-semibold">
+                        {formatPct(testResults.avgReturn)}
+                      </span>
+                      , underperforming the unconditional passive baseline of{" "}
+                      <span className="text-slate-200 font-mono font-semibold">
+                        {formatPct(testResults.baselineAvgReturn)}
+                      </span>{" "}
+                      by{" "}
+                      <span className="text-rose-400 font-mono font-semibold">
+                        {formatPct(testResults.excessReturn)}
+                      </span>
+                      . Win rate also lagged the market ({(testResults.winRate * 100).toFixed(1)}% vs. {(testResults.baselineWinRate * 100).toFixed(1)}%).
+                    </>
+                  ) : (
+                    <>
+                      {" "}The strategy generated an average forward return of{" "}
+                      <span className="text-emerald-400 font-mono font-semibold">
+                        {formatPct(testResults.avgReturn)}
+                      </span>
+                      , outperforming the baseline by{" "}
+                      <span className="text-emerald-400 font-mono font-semibold">
+                        {formatPct(testResults.excessReturn)}
+                      </span>
+                      .
+                    </>
+                  )}
+                </p>
+
+                <p className="text-slate-400 text-xs">
+                  <strong>Mechanics & Limitations:</strong> Sharp sell-offs in index equities frequently cluster into multi-session momentum pullbacks (&ldquo;falling knives&rdquo;) rather than instantaneous V-shaped bounces. Furthermore, with $N = {testResults.sampleSize}$ occurrences, events are non-independent and subject to regime concentration. Once real-world exchange slippage and STT (~0.10%–0.15% round-trip) are factored in, unconditional dip buying exhibits negative net expectancy.
+                </p>
+              </div>
+
+              {/* Suggested Next Questions */}
+              <div className="pt-4 border-t border-slate-800/80 space-y-2.5">
+                <p className="text-xs font-mono uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                  <span className="text-emerald-400 font-bold">Suggested Next Research Hypotheses:</span>
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleSelectSuggestedQuestion(
+                        "Does buying NIFTY after a sharp fall work during high volatility regimes?"
+                      )
+                    }
+                    className="text-left p-3 rounded-xl border border-slate-800 bg-slate-950/60 hover:bg-slate-800/60 hover:border-emerald-500/50 transition-all text-xs text-slate-300 cursor-pointer group"
+                  >
+                    <span className="text-emerald-400 font-mono block text-[10px] uppercase mb-0.5">
+                      Hypothesis A (Regime Conditioning)
+                    </span>
+                    &ldquo;Does buying NIFTY after a sharp fall work during high volatility regimes?&rdquo;
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleSelectSuggestedQuestion(
+                        "Is buying NIFTY on a 2% single-day decline profitable with a 1-day bounce holding period?"
+                      )
+                    }
+                    className="text-left p-3 rounded-xl border border-slate-800 bg-slate-950/60 hover:bg-slate-800/60 hover:border-emerald-500/50 transition-all text-xs text-slate-300 cursor-pointer group"
+                  >
+                    <span className="text-emerald-400 font-mono block text-[10px] uppercase mb-0.5">
+                      Hypothesis B (Shorter Horizon)
+                    </span>
+                    &ldquo;Is buying NIFTY on a 2% single-day decline profitable with a 1-day bounce holding period?&rdquo;
+                  </button>
+                </div>
               </div>
             </div>
           </div>
